@@ -58,4 +58,34 @@ public sealed class IncidentQueries(SecureLabDbContext dbContext, ILogger<Incide
                     .ToList()))
             .SingleOrDefaultAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<IncidentSeveritySummaryResponse>> GetSeveritySummaryAsync(IncidentStatus? status, 
+    CancellationToken cancellationToken)
+    {
+        var query = dbContext.Incidents.AsNoTracking();
+        if (status is not null)
+        {
+            query = query.Where(incident => incident.Status == status);
+        }
+
+        var groups = await query
+            .GroupBy(incident => incident.Severity)
+            .Select(group => new { Severity = group.Key, Count = group.Count() })
+            .ToListAsync(cancellationToken);
+
+        var result = groups
+            .OrderByDescending(group => group.Count)
+            .ThenBy(group => group.Severity.ToString(), StringComparer.Ordinal)
+            .Select(group => new IncidentSeveritySummaryResponse(
+                group.Severity.ToString(),
+                group.Count))
+            .ToList();
+
+        logger.LogInformation(
+            "Built severity summary with {GroupCount} groups for status filter {Status}",
+            result.Count,
+            status);
+
+        return result;
+    }
 }
