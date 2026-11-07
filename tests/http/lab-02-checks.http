@@ -147,3 +147,18 @@ GET {{api}}/api/incidents/search?q=O%27Brien
 
 ###
 GET {{api}}/api/incidents/search?q=%D0%BA%D0%BE%D0%BC%D0%BF%27%D1%8E%D1%82%D0%B5%D1%80%D0%BD%D0%BE%D0%B3%D0%BE
+
+###
+GET {{api}}/api/incidents/search?q=%25
+
+###
+GET {{api}}/api/incidents/search?sortBy=price
+
+###
+GET {{api}}/api/incidents/search?sortBy=severity
+
+###
+GET {{api}}/api/incidents/search?sortBy=status
+
+###
+GET {{api}}/api/incidents/search
