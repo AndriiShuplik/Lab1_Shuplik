@@ -6,11 +6,21 @@ namespace SecureLab.Api.Tests;
 
 public sealed class CreateIncidentTests(SecureLabApiFactory factory) : IClassFixture<SecureLabApiFactory>
 {
-    private readonly HttpClient _client = factory.CreateClient();
+        private HttpClient? _client;
 
-    private Task<HttpResponseMessage> PostAsync(
-        string title, string description, string severity, DateTimeOffset occurredAtUtc) =>
-        _client.PostAsJsonAsync("/api/incidents", new { title, description, severity, occurredAtUtc });
+    private static string StudyPassword =>
+        Environment.GetEnvironmentVariable("SeedUsers__Password")
+        ?? throw new InvalidOperationException("Set local SeedUsers__Password outside Git.");
+
+    private async Task<HttpClient> ClientAsync() =>
+        _client ??= await factory.LoginAsync("alice", StudyPassword);
+
+        private async Task<HttpResponseMessage> PostAsync(
+        string title, string description, string severity, DateTimeOffset occurredAtUtc)
+    {
+        var client = await ClientAsync();
+        return await client.PostAsJsonAsync("/api/incidents", new { title, description, severity, occurredAtUtc });
+    }
 
     private static async Task<JsonElement> ErrorsAsync(HttpResponseMessage response)
     {
@@ -80,7 +90,7 @@ public sealed class CreateIncidentTests(SecureLabApiFactory factory) : IClassFix
         var title = $"Regression-{Guid.NewGuid():N}";
         try
         {
-            using var response = await _client.PostAsJsonAsync("/api/incidents", new
+            using var response = await (await ClientAsync()).PostAsJsonAsync("/api/incidents", new
             {
                 title,
                 description = "Опис для перевірки відсутнього часу події.",
@@ -204,7 +214,7 @@ public sealed class CreateIncidentTests(SecureLabApiFactory factory) : IClassFix
         var sentId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         try
         {
-            using var response = await _client.PostAsJsonAsync("/api/incidents", new
+            using var response = await (await ClientAsync()).PostAsJsonAsync("/api/incidents", new
             {
                 title,
                 description = "Опис для перевірки server-managed полів.",
@@ -221,7 +231,7 @@ public sealed class CreateIncidentTests(SecureLabApiFactory factory) : IClassFix
             Assert.NotEqual(sentId, createdId);
             Assert.Equal("New", created.RootElement.GetProperty("status").GetString());
 
-            var details = await _client.GetFromJsonAsync<JsonElement>($"/api/incidents/{createdId}");
+            var details = await (await ClientAsync()).GetFromJsonAsync<JsonElement>($"/api/incidents/{createdId}");
             Assert.Equal("New", details.GetProperty("status").GetString());
             Assert.Equal("Аліса Коваль", details.GetProperty("ownerDisplayName").GetString());
             Assert.True(details.GetProperty("createdAtUtc").GetDateTimeOffset() > DateTimeOffset.UtcNow.AddMinutes(-5));
