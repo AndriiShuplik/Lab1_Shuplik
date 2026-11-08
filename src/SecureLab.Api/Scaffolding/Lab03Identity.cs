@@ -2,6 +2,7 @@ using System.Net.Mail;
 using Microsoft.AspNetCore.Identity;
 using SecureLab.Api.Data;
 using SecureLab.Api.Data.Entities;
+using System.Security.Claims;
 
 namespace SecureLab.Api.Scaffolding;
 
@@ -74,13 +75,22 @@ public static class Lab03Identity
             return result.Succeeded ? Results.NoContent() : Results.Unauthorized();
         });
         app.MapPost("/api/auth/logout", () => Results.StatusCode(StatusCodes.Status501NotImplemented));
-        app.MapGet("/api/me", async (HttpContext context, SecureLabDbContext db) =>
+               app.MapGet("/api/me", async (HttpContext context, UserManager<ApplicationUser> users) =>
         {
-            if (!Guid.TryParse(context.Request.Headers["X-Demo-UserId"], out var claimedId))
-                return Results.StatusCode(StatusCodes.Status501NotImplemented);
-            var user = await db.Users.FindAsync(claimedId);
-            return user is null ? Results.NotFound() : Results.Ok(new { user.Id, user.UserName, user.DisplayName });
-        });
+            var idValue = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(idValue, out var userId))
+            {
+                return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
+            }
+
+            var user = await users.FindByIdAsync(userId.ToString());
+            if (user is null)
+            {
+                return Results.Unauthorized();
+            }
+
+            return Results.Ok(new MeResponse(user.Id, user.UserName!, user.DisplayName));
+        }).RequireAuthorization();
         app.MapGet("/api/auth/session-check", () => Results.NoContent()).RequireAuthorization();
     }
 
@@ -153,3 +163,4 @@ public static class Lab03Identity
 public sealed record RegisterRequest(string? UserName, string? Email, string? DisplayName, string? Password);
 public sealed record RegisterResponse(Guid Id, string UserName, string DisplayName);
 public sealed record LoginInput(string? UserName, string? Password);
+public sealed record MeResponse(Guid Id, string UserName, string DisplayName);
