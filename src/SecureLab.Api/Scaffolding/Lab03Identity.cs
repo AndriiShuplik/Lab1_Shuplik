@@ -1,3 +1,4 @@
+using System.Net.Mail;
 using Microsoft.AspNetCore.Identity;
 using SecureLab.Api.Data;
 using SecureLab.Api.Data.Entities;
@@ -35,22 +36,35 @@ public static class Lab03Identity
 
     public static void MapLab03Identity(this WebApplication app)
     {
-        app.MapPost("/api/auth/register", async (RegistrationInput input, UserManager<ApplicationUser> users) =>
+        app.MapPost("/api/auth/register", async (RegisterRequest input, UserManager<ApplicationUser> users) =>
         {
-            // ЛР 03: завершіть DTO validation та перевірки довірчої межі.
-            if (string.IsNullOrWhiteSpace(input.UserName) || string.IsNullOrWhiteSpace(input.Email)
-                || string.IsNullOrWhiteSpace(input.DisplayName) || string.IsNullOrEmpty(input.Password))
-                return Results.BadRequest();
+            var errors = ValidateRegistration(input);
+            if (errors.Count > 0)
+            {
+                return Results.ValidationProblem(errors);
+            }
+
             var user = new ApplicationUser
             {
-                Id = Guid.NewGuid(), UserName = input.UserName.Trim(), Email = input.Email.Trim(),
-                DisplayName = input.DisplayName.Trim()
+                Id = Guid.NewGuid(),
+                UserName = input.UserName!.Trim(),
+                Email = input.Email!.Trim(),
+                DisplayName = input.DisplayName!.Trim()
             };
-            var result = await users.CreateAsync(user, input.Password);
-            if (!result.Succeeded) return Results.BadRequest(new { message = "Registration failed" });
+
+            var result = await users.CreateAsync(user, input.Password!);
+            if (!result.Succeeded)
+            {
+                return MapIdentityFailure(result);
+            }
+
             var role = await users.AddToRoleAsync(user, DbSeeder.ReporterRole);
-            if (!role.Succeeded) throw new InvalidOperationException("Default role assignment failed.");
-            return Results.Created("/api/me", new { user.Id, user.UserName, user.DisplayName });
+            if (!role.Succeeded)
+            {
+                throw new InvalidOperationException("Default role assignment failed.");
+            }
+
+            return Results.Created("/api/me", new RegisterResponse(user.Id, user.UserName!, user.DisplayName));
         });
         app.MapPost("/api/auth/login", async (LoginInput input, SignInManager<ApplicationUser> signIn) =>
         {
@@ -60,7 +74,6 @@ public static class Lab03Identity
             return result.Succeeded ? Results.NoContent() : Results.Unauthorized();
         });
         app.MapPost("/api/auth/logout", () => Results.StatusCode(StatusCodes.Status501NotImplemented));
-        // Навмисно хибна навчальна довіра: ЛР 03 замінює заявлений id на verified principal.
         app.MapGet("/api/me", async (HttpContext context, SecureLabDbContext db) =>
         {
             if (!Guid.TryParse(context.Request.Headers["X-Demo-UserId"], out var claimedId))
@@ -68,10 +81,75 @@ public static class Lab03Identity
             var user = await db.Users.FindAsync(claimedId);
             return user is null ? Results.NotFound() : Results.Ok(new { user.Id, user.UserName, user.DisplayName });
         });
-        // Приклад лише mechanics: не повертає identity і не реалізує оцінювану operation.
         app.MapGet("/api/auth/session-check", () => Results.NoContent()).RequireAuthorization();
+    }
+
+    private static Dictionary<string, string[]> ValidateRegistration(RegisterRequest input)
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        var userName = input.UserName?.Trim();
+        if (string.IsNullOrEmpty(userName) || userName.Length is < 3 or > 64)
+        {
+            errors["userName"] = ["User name must be 3-64 characters."];
+        }
+        else if (!userName.All(c => char.IsAsciiLetterOrDigit(c) || "-._@+".Contains(c)))
+        {
+            errors["userName"] = ["User name may contain only Latin letters, digits and - . _ @ +"];
+        }
+
+        var email = input.Email?.Trim();
+        if (string.IsNullOrEmpty(email) || email.Length > 256
+            || !MailAddress.TryCreate(email, out var parsed) || parsed?.Address != email)
+        {
+            errors["email"] = ["A valid email address up to 256 characters is required."];
+        }
+
+        var displayName = input.DisplayName?.Trim();
+        if (string.IsNullOrEmpty(displayName) || displayName.Length > 120)
+        {
+            errors["displayName"] = ["Display name must be 1-120 characters."];
+        }
+
+        if (string.IsNullOrEmpty(input.Password) || input.Password.Length is < 10 or > 128)
+        {
+            errors["password"] = ["Password must be 10-128 characters."];
+        }
+
+        return errors;
+    }
+
+    private static IResult MapIdentityFailure(IdentityResult result)
+    {
+        var codes = result.Errors.Select(error => error.Code).ToHashSet();
+
+        if (codes.Contains("DuplicateUserName") || codes.Contains("DuplicateEmail"))
+        {
+            return Results.Problem(title: "Registration conflict", statusCode: StatusCodes.Status409Conflict);
+        }
+
+        var errors = new Dictionary<string, string[]>();
+        if (codes.Any(code => code.StartsWith("Password", StringComparison.Ordinal)))
+        {
+            errors["password"] = ["Password must contain upper and lower case letters, a digit and a symbol."];
+        }
+
+        if (codes.Contains("InvalidUserName"))
+        {
+            errors["userName"] = ["User name contains characters that are not allowed."];
+        }
+
+        if (codes.Contains("InvalidEmail"))
+        {
+            errors["email"] = ["Email address is not valid."];
+        }
+
+        return errors.Count > 0
+            ? Results.ValidationProblem(errors)
+            : Results.Problem(title: "Registration failed", statusCode: StatusCodes.Status400BadRequest);
     }
 }
 
-public sealed record RegistrationInput(string? UserName, string? Email, string? DisplayName, string? Password);
+public sealed record RegisterRequest(string? UserName, string? Email, string? DisplayName, string? Password);
+public sealed record RegisterResponse(Guid Id, string UserName, string DisplayName);
 public sealed record LoginInput(string? UserName, string? Password);
