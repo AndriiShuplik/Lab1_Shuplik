@@ -1,3 +1,5 @@
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Net.Mail;
 using Microsoft.AspNetCore.Identity;
 using SecureLab.Api.Data;
@@ -33,7 +35,35 @@ public static class Lab03Identity
                 return Task.CompletedTask;
             };
         });
+
+        builder.Services.AddRateLimiter(_ => { });
+        builder.Services.AddOptions<RateLimiterOptions>()
+            .Configure<IConfiguration, ILoggerFactory>((options, configuration, loggers) =>
+            {
+                var permitLimit = configuration.GetValue<int>("LoginRateLimit:PermitLimit", 20);
+                var windowSeconds = configuration.GetValue<int>("LoginRateLimit:WindowSeconds", 60);
+                var log = loggers.CreateLogger<Program>();
+
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+                options.OnRejected = (context, _) =>
+                {
+                    log.LogWarning(
+                        "Authentication event {EventType}: result {Result}, trace {TraceId}",
+                        "login", "rate_limited", context.HttpContext.TraceIdentifier);
+                    return ValueTask.CompletedTask;
+                };
+                options.AddPolicy("login", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+                    httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = permitLimit,
+                        Window = TimeSpan.FromSeconds(windowSeconds),
+                        QueueLimit = 0
+                    }));
+            });
     }
+
+    
 
     public static void MapLab03Identity(this WebApplication app)
     {
@@ -67,19 +97,42 @@ public static class Lab03Identity
 
             return Results.Created("/api/me", new RegisterResponse(user.Id, user.UserName!, user.DisplayName));
         });
-        app.MapPost("/api/auth/login", async (LoginInput input, SignInManager<ApplicationUser> signIn) =>
+                app.MapPost("/api/auth/login", async (
+            LoginInput input,
+            SignInManager<ApplicationUser> signIn,
+            HttpContext httpContext,
+            ILogger<Program> logger) =>
         {
             if (string.IsNullOrWhiteSpace(input.UserName) || string.IsNullOrEmpty(input.Password))
+            {
+                logger.LogWarning(
+                    "Authentication event {EventType}: result {Result}, trace {TraceId}",
+                    "login", "failure", httpContext.TraceIdentifier);
                 return Results.Unauthorized();
+            }
+
             var result = await signIn.PasswordSignInAsync(input.UserName, input.Password, false, false);
-            return result.Succeeded ? Results.NoContent() : Results.Unauthorized();
-        });
-                app.MapPost("/api/auth/logout", async (SignInManager<ApplicationUser> signIn) =>
+            if (result.Succeeded)
+            {
+                logger.LogInformation(
+                    "Authentication event {EventType}: result {Result}, user {UserName}, trace {TraceId}",
+                    "login", "success", input.UserName, httpContext.TraceIdentifier);
+                return Results.NoContent();
+            }
+
+            logger.LogWarning(
+                "Authentication event {EventType}: result {Result}, trace {TraceId}",
+                "login", "failure", httpContext.TraceIdentifier);
+            return Results.Unauthorized();
+        }).RequireRateLimiting("login");
+
+        app.MapPost("/api/auth/logout", async (SignInManager<ApplicationUser> signIn) =>
         {
             await signIn.SignOutAsync();
             return Results.NoContent();
         });
-               app.MapGet("/api/me", async (HttpContext context, UserManager<ApplicationUser> users) =>
+
+        app.MapGet("/api/me", async (HttpContext context, UserManager<ApplicationUser> users) =>
         {
             var idValue = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (!Guid.TryParse(idValue, out var userId))
@@ -162,9 +215,11 @@ public static class Lab03Identity
             ? Results.ValidationProblem(errors)
             : Results.Problem(title: "Registration failed", statusCode: StatusCodes.Status400BadRequest);
     }
-}
+
+
 
 public sealed record RegisterRequest(string? UserName, string? Email, string? DisplayName, string? Password);
 public sealed record RegisterResponse(Guid Id, string UserName, string DisplayName);
 public sealed record LoginInput(string? UserName, string? Password);
 public sealed record MeResponse(Guid Id, string UserName, string DisplayName);
+}
