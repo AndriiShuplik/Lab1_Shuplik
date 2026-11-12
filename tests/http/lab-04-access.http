@@ -1,0 +1,142 @@
+@host = http://localhost:5080
+@aliceId = 20000000-0000-0000-0000-000000000001
+@bobId = 20000000-0000-0000-0000-000000000002
+@comment2 = 30000000-0000-0000-0000-000000000002
+@comment3 = 30000000-0000-0000-0000-000000000003
+
+###
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "userName": "alice", "password": "{{$processEnv SeedUsers__Password}}" }
+
+###
+GET {{host}}/api/incidents/{{aliceId}}
+Accept: application/json
+
+###
+GET {{host}}/api/incidents/{{bobId}}
+Accept: application/json
+
+###
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "userName": "bob", "password": "{{$processEnv SeedUsers__Password}}" }
+
+###
+GET {{host}}/api/incidents/{{bobId}}
+Accept: application/json
+
+###
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "userName": "alice", "password": "{{$processEnv SeedUsers__Password}}" }
+
+###
+PUT {{host}}/api/incidents/{{bobId}}
+Content-Type: application/json
+
+{ "title": "Changed by Alice", "description": "Description changed by Alice through a foreign id." }
+
+###
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "userName": "bob", "password": "{{$processEnv SeedUsers__Password}}" }
+
+###
+GET {{host}}/api/incidents/{{bobId}}
+Accept: application/json
+
+###
+# @name createBobTest
+POST {{host}}/api/incidents
+Content-Type: application/json
+
+{
+  "title": "Bob test incident for delete check",
+  "description": "Test incident created by Bob for the delete check.",
+  "severity": "Low",
+  "occurredAtUtc": "2026-11-01T10:00:00Z"
+}
+
+###
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "userName": "alice", "password": "{{$processEnv SeedUsers__Password}}" }
+
+###
+DELETE {{host}}/api/incidents/{{createBobTest.response.body.$.id}}
+
+###
+GET {{host}}/api/incidents/{{createBobTest.response.body.$.id}}
+Accept: application/json
+
+###
+GET {{host}}/api/incidents
+Accept: application/json
+
+###
+GET {{host}}/api/incident-comments/{{comment2}}
+Accept: application/json
+
+###
+GET {{host}}/api/incident-comments/{{comment3}}
+Accept: application/json
+
+###
+GET {{host}}/api/incidents/severity-summary
+Accept: application/json
+
+###
+GET {{host}}/api/incidents/search?q=O%27Brien
+Accept: application/json
+
+###
+# @name createAliceTest
+POST {{host}}/api/incidents
+Content-Type: application/json
+
+{
+  "title": "Alice test incident for triage check",
+  "description": "Test incident created by Alice for the triage and overposting checks.",
+  "severity": "Low",
+  "occurredAtUtc": "2026-11-01T10:00:00Z"
+}
+
+###
+POST {{host}}/api/incidents/{{createAliceTest.response.body.$.id}}/triage
+Accept: application/json
+
+###
+PUT {{host}}/api/incidents/{{createAliceTest.response.body.$.id}}
+Content-Type: application/json
+
+{
+  "title": "Alice test incident changed",
+  "description": "Description changed together with extra fields.",
+  "ownerUserId": "10000000-0000-0000-0000-000000000002",
+  "role": "Administrator",
+  "status": "Closed"
+}
+
+###
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "userName": "morgan", "password": "{{$processEnv SeedUsers__Password}}" }
+
+###
+GET {{host}}/api/incidents/{{aliceId}}
+Accept: application/json
+
+###
+GET {{host}}/api/incident-comments/{{comment3}}
+Accept: application/json
+
+###
+GET {{host}}/api/incidents/{{createAliceTest.response.body.$.id}}
+Accept: application/json
