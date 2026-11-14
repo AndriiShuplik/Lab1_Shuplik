@@ -6,16 +6,24 @@ using SecureLab.Api.Presentation.Contracts;
 
 namespace SecureLab.Api.Tests;
 
-public sealed class IncidentEndpointTests(SecureLabApiFactory factory)
-    : IClassFixture<SecureLabApiFactory>
+public sealed class IncidentEndpointTests(SessionsFixture sessions) : IClassFixture<SessionsFixture>
 {
-    private readonly HttpClient _client = factory.CreateClient();
+    [Fact]
+    public async Task GetList_AsReporter_ReturnsOnlyOwnIncidents()
+    {
+        var alice = await sessions.Alice;
+        var incidents = await alice.GetFromJsonAsync<List<IncidentListItemResponse>>("/api/incidents");
+
+        Assert.NotNull(incidents);
+        Assert.Contains(incidents, incident => incident.Id == DbSeeder.AliceIncidentId);
+        Assert.DoesNotContain(incidents, incident => incident.Id == DbSeeder.BobIncidentId);
+    }
 
     [Fact]
-    public async Task GetList_ReturnsSeededIncidents()
+    public async Task GetList_AsAnalyst_ReturnsIncidentsOfAllOwners()
     {
-        var incidents = await _client.GetFromJsonAsync<List<IncidentListItemResponse>>(
-            "/api/incidents");
+        var morgan = await sessions.Morgan;
+        var incidents = await morgan.GetFromJsonAsync<List<IncidentListItemResponse>>("/api/incidents");
 
         Assert.NotNull(incidents);
         Assert.Contains(incidents, incident => incident.Id == DbSeeder.AliceIncidentId);
@@ -25,7 +33,8 @@ public sealed class IncidentEndpointTests(SecureLabApiFactory factory)
     [Fact]
     public async Task GetDetails_ForUnknownId_ReturnsProblemDetails404()
     {
-        using var response = await _client.GetAsync($"/api/incidents/{Guid.NewGuid()}");
+        var alice = await sessions.Alice;
+        using var response = await alice.GetAsync($"/api/incidents/{Guid.NewGuid()}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -34,8 +43,8 @@ public sealed class IncidentEndpointTests(SecureLabApiFactory factory)
     [Fact]
     public async Task GetDetails_DoesNotExposeInternalOwnerFields()
     {
-        using var response = await _client.GetAsync(
-            $"/api/incidents/{DbSeeder.AliceIncidentId}");
+        var alice = await sessions.Alice;
+        using var response = await alice.GetAsync($"/api/incidents/{DbSeeder.AliceIncidentId}");
         var json = await response.Content.ReadAsStringAsync();
         using var document = JsonDocument.Parse(json);
 
@@ -48,7 +57,8 @@ public sealed class IncidentEndpointTests(SecureLabApiFactory factory)
     [Fact]
     public async Task ClientScript_DoesNotUseDangerousInnerHtmlSink()
     {
-        var script = await _client.GetStringAsync("/app.js");
+        using var client = sessions.Factory.CreateClient();
+        var script = await client.GetStringAsync("/app.js");
 
         Assert.DoesNotContain("innerHTML", script, StringComparison.Ordinal);
         Assert.Contains("textContent", script, StringComparison.Ordinal);

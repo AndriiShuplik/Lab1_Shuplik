@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using SecureLab.Api.Application.Incidents;
 using Microsoft.EntityFrameworkCore;
 using SecureLab.Api.Data;
 using SecureLab.Api.Presentation.Contracts;
@@ -20,14 +22,20 @@ public static class IncidentCommentEndpoints
         return endpoints;
     }
 
-    private static async Task<IResult> GetByIdAsync(
+        private static async Task<IResult> GetByIdAsync(
         Guid id,
+        ClaimsPrincipal user,
         SecureLabDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        var isAnalyst = IncidentAccess.IsAnalyst(user);
+        var userId = IncidentAccess.GetUserId(user);
+
         var comment = await dbContext.IncidentComments
             .AsNoTracking()
             .Where(item => item.Id == id)
+            .Where(item => isAnalyst
+                || (item.Incident.OwnerUserId == userId && !item.IsInternal))
             .Select(item => new IncidentCommentDetailsResponse(
                 item.Id,
                 item.Incident.Id,
@@ -38,10 +46,7 @@ public static class IncidentCommentEndpoints
             .SingleOrDefaultAsync(cancellationToken);
 
         return comment is null
-            ? Results.Problem(
-                title: "Коментар не знайдено",
-                detail: $"Коментар '{id}' не існує.",
-                statusCode: StatusCodes.Status404NotFound)
+            ? ResourceProblems.NotFound("Коментар не знайдено")
             : Results.Ok(comment);
     }
 }

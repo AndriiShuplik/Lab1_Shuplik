@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using SecureLab.Api.Data;
 using SecureLab.Api.Data.Entities;
+using SecureLab.Api.Application.Incidents;
 
 namespace SecureLab.Api.Scaffolding;
 
@@ -9,12 +10,13 @@ public static class Lab02Endpoints
 {
     public static void MapLab02Endpoints(this WebApplication app)
     {
-        app.MapGet("/api/incidents/search", async (string? q, string? sortBy, SecureLabDbContext db, CancellationToken ct) =>
+        app.MapGet("/api/incidents/search", async (string? q, string? sortBy, ClaimsPrincipal user, SecureLabDbContext db, CancellationToken ct) =>
         {
             var pattern = "%" + EscapeLike(q ?? "") + "%";
             var found = db.Incidents.AsNoTracking()
+                .VisibleTo(user)
                 .Where(item => EF.Functions.ILike(item.Title, pattern, "\\")
-                    || EF.Functions.ILike(item.Description, pattern, "\\"));
+                    || EF.Functions.ILike(item.Description, pattern, "\\"));    
 
             IQueryable<Incident>? ordered = sortBy switch
             {
@@ -52,7 +54,7 @@ public static class Lab02Endpoints
                     item.CreatedAtUtc))
                 .ToListAsync(ct);
             return Results.Ok(items);
-        });
+        }).RequireAuthorization();
         app.MapPost("/api/incidents", async (CreateIncidentRequest request, HttpContext httpContext, SecureLabDbContext db, CancellationToken ct) =>
         {
             var now = DateTimeOffset.UtcNow;
@@ -95,17 +97,19 @@ public static class Lab02Endpoints
 
             var occurredAtUtc = request.OccurredAtUtc!.Value.ToUniversalTime();
 
+            var ownerClaim = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(ownerClaim, out var ownerId))
+                return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
+
             var duplicate = await db.Incidents.AnyAsync(
-                item => item.Title == title && item.Status != IncidentStatus.Closed, ct);
+                item => item.OwnerUserId == ownerId
+                    && item.Title == title
+                    && item.Status != IncidentStatus.Closed, ct);
             if (duplicate)
                 return Results.Problem(
                     statusCode: StatusCodes.Status409Conflict,
                     title: "Інцидент із таким заголовком уже існує",
                     detail: "Активний інцидент із цим заголовком уже зареєстровано.");
-
-            var ownerClaim = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!Guid.TryParse(ownerClaim, out var ownerId))
-                return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
            
             var incident = new Incident
             {

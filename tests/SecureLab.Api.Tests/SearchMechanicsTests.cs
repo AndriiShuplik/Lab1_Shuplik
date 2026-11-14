@@ -2,13 +2,14 @@ using System.Net;
 
 namespace SecureLab.Api.Tests;
 
-public sealed class SearchMechanicsTests(SecureLabApiFactory factory) : IClassFixture<SecureLabApiFactory>
+public sealed class SearchMechanicsTests(SessionsFixture sessions) : IClassFixture<SessionsFixture>
 {
     [Fact]
-    public async Task Search_ReturnsJson()
+    public async Task Search_ForSignedInUser_ReturnsJson()
     {
-        using var client = factory.CreateClient();
-        using var response = await client.GetAsync("/api/incidents/search?q=навчальн");
+        var alice = await sessions.Alice;
+        using var response = await alice.GetAsync("/api/incidents/search?q=навчальн");
+
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
     }
