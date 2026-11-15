@@ -1,0 +1,25 @@
+@host = http://localhost:5080
+
+### REG-CORS-01: дозволений origin, очікуємо Access-Control-Allow-Origin: http://localhost:4173
+GET {{host}}/health
+Origin: http://localhost:4173
+
+### REG-CORS-01: недозволений origin, Access-Control-Allow-Origin відсутній, статус усе одно 200
+GET {{host}}/health
+Origin: http://localhost:4174
+
+### Preflight з дозволеного origin: 204 і три Access-Control-Allow-*
+OPTIONS {{host}}/health
+Origin: http://localhost:4173
+Access-Control-Request-Method: GET
+Access-Control-Request-Headers: x-lab-cors-probe
+
+### Preflight з недозволеного origin: 204 без Access-Control-*
+OPTIONS {{host}}/health
+Origin: http://localhost:4174
+Access-Control-Request-Method: GET
+Access-Control-Request-Headers: x-lab-cors-probe
+
+### Direct HTTP без cookie: CORS не діє, працює authentication (401)
+GET {{host}}/api/incidents
+Origin: http://localhost:4174
