@@ -23,6 +23,8 @@
 - **Профілі:** Development (`launchSettings.json`, profile `http`) і Production-like (`--no-launch-profile -c Release`, `Production.ps1`). Для кожного спостереження вказую профіль і клієнт (curl.exe, браузер Chrome, cookie-aware тестовий host).
 - **Терміналі:** Terminal1 для команд, Terminal2 для API.
 - **Секрети:** `SeedUsers__Password` задано лише в змінній середовища Terminal1, у Git і в докази він не потрапляє.
+- **Перегляд diff перед merge:** я переглянув `git diff 00cf249..HEAD` (37 файлів): у ньому немає пароля seed, значень cookie чи токенів, журналів, `.env`, змін `.csproj` і `packages.lock.json`. README доповнено лише фактичними командами ЛР 6 (розділ 8 README).
+- **Controlled errors і debug hooks:** для помилки з розділу 8.1 я не додавав жодного debug endpoint: її викликає лише тимчасовий запуск із недосяжною БД, який після експерименту прибрано. На фінальному прогоні у Production-like профілі `/openapi/v1.json` дає 404, `/scalar/v1` повертає сторінку клієнта (fallback), а не Scalar, `csrf-token` без входу дає 401.
 ## 5. Findings summary
 | ID | Актив | Вплив | Ймовірність | Пріоритет | Статус | Повторна перевірка |
 |---|---|---|---|---|---|---|
@@ -91,6 +93,10 @@ fail: Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware[1]
 ```
 
 Правило зіставлення: середній 32-символьний сегмент `traceId` з відповіді дорівнює `TraceId` у журналі (`84f5d8414f6d0d019023089e4cf5197c`), а останні 16 символів до `-00` дорівнюють `SpanId`. Доказ: `docs/evidence/lab06/02-prod-500-response.png` (відповідь у Terminal1) і `docs/evidence/lab06/03-prod-500-log.png` (запис у Terminal2). У журналі немає пароля із запиту й connection string; причина `Failed to connect to 127.0.0.1:54399` видна лише у внутрішньому каналі.
+
+**Відновлення після експерименту (CP-01).** Після контрольованої помилки я зупинив Production-запуск, прибрав тимчасові змінні середовища (`ASPNETCORE_ENVIRONMENT`, `ASPNETCORE_URLS`, `ConnectionStrings__SecureLab`, `Logging__Console__IncludeScopes`) і повернув звичайний Development-запуск із правильним connection string. `/health` дав 200, вхід і нормальний клієнтський потік підтверджено в розділі 8.4.
+
+**Обмеження для захищених 4xx у Production.** Перевірки `GET /api/incidents?status=Unknown` (400) і `GET /api/incidents/<неіснуючий id>` (404) я виконав у Development тим самим клієнтом із cookie Alice (розділ 8.2). Cookie-aware Production-host для цих двох запитів я окремо не налаштовував: штатний `SecureLabApiFactory` працює в Development, а в Production cookie має `Secure`, тому на `http://localhost` вона не повертається. Для Production підтверджено лише відповіді, що не потребують входу (404 для OpenAPI, 500 із `traceId`), і це обмеження висновку.
 
 **Спостереження, яке стає finding.** На цій 500 відповідь не має `X-Content-Type-Options`, `Referrer-Policy` і `Content-Security-Policy`, хоча на 200 і 404 того ж профілю вони є. Це оформлю як F-01 і виправлю на етапі 2.
 
@@ -398,4 +404,6 @@ Audit trail привілейованого переходу `Incident.Status`: �
 | EV-14 | аудит залежностей | `dotnet package list --vulnerable --include-transitive` (розділ 9.2) | вразливих пакетів немає |
 | EV-15 | браузерний DOM-тест REG-XSS-01 | `tests/browser/description-dom.js` у Chrome | 15 PASS, `RESULT: PASS` |
 
-Знімки EV-01…EV-07 справжні: EV-01…EV-03 зроблено мною системним знімком екрана з термінала VS Code, EV-04…EV-07 це кадри з DevTools справжнього Chrome, яким керував скрипт через DevTools Protocol (кожен кадр складено з двох справжніх знімків: сторінка й DevTools). Відмінність від методики: гілку `lab/6-hardening-review` створено від `main` (різниця з `v0.5.0` лише `docs/`).
+Знімки EV-01…EV-07 справжні: EV-01…EV-03 зроблено мною системним знімком екрана з термінала VS Code, EV-04…EV-07 це кадри з DevTools справжнього Chrome, яким керував скрипт через DevTools Protocol (кожен кадр складено з двох справжніх знімків: сторінка й DevTools). Передача: гілку `lab/6-hardening-review`, `main` і тег `v1.0.0` передано в репозиторій https://github.com/AndriiShuplik/Lab1_Shuplik; результат `git rev-list -n 1 v1.0.0` дорівнює hash на першій сторінці PDF.
+
+Відмінність від методики: гілку `lab/6-hardening-review` створено від `main` (різниця з `v0.5.0` лише `docs/`).
