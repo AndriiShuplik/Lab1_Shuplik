@@ -219,6 +219,7 @@ public static class IncidentEndpoints
         incident.Status = IncidentStatus.Triaged;
         incident.UpdatedAtUtc = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
+        audit.Allowed(httpContext, "incident.triage", incident.Id);
 
         return Results.Ok(new IncidentStatusResponse(
             incident.Id,

@@ -43,14 +43,18 @@ public static class Lab03Identity
             {
                 var permitLimit = configuration.GetValue<int>("LoginRateLimit:PermitLimit", 20);
                 var windowSeconds = configuration.GetValue<int>("LoginRateLimit:WindowSeconds", 60);
+                var searchPermitLimit = configuration.GetValue<int>("SearchRateLimit:PermitLimit", 60);
+                var searchWindowSeconds = configuration.GetValue<int>("SearchRateLimit:WindowSeconds", 60);
                 var log = loggers.CreateLogger<Program>();
 
                 options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
                 options.OnRejected = (context, _) =>
                 {
+                    var policy = context.HttpContext.GetEndpoint()?
+                        .Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName ?? "unknown";
                     log.LogWarning(
-                        "Authentication event {EventType}: result {Result}, trace {TraceId}",
-                        "login", "rate_limited", context.HttpContext.TraceIdentifier);
+                        "Rate limit event {EventType}: result {Result}, trace {TraceId}",
+                        policy, "rate_limited", context.HttpContext.TraceIdentifier);
                     return ValueTask.CompletedTask;
                 };
                 options.AddPolicy("login", httpContext => RateLimitPartition.GetFixedWindowLimiter(
@@ -59,6 +63,14 @@ public static class Lab03Identity
                     {
                         PermitLimit = permitLimit,
                         Window = TimeSpan.FromSeconds(windowSeconds),
+                        QueueLimit = 0
+                    }));
+                options.AddPolicy("search", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+                    httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = searchPermitLimit,
+                        Window = TimeSpan.FromSeconds(searchWindowSeconds),
                         QueueLimit = 0
                     }));
             });
