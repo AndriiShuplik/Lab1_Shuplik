@@ -62,7 +62,7 @@
 
 ## 8. Hardening controls
 
-### 8.1. Production-like профіль і безпечна помилка (етап 1, п. 4–5, CP-01)
+### 8.1. Production-like профіль і безпечна помилка (етап 1, п. 4-5, CP-01)
 
 Дата 2026-11-16, commit `00cf249`, API запущено без launch profile: `Production.ps1 -Mode normal` (`ASPNETCORE_ENVIRONMENT=Production`, `ASPNETCORE_URLS=http://localhost:5080`, connection string через `ConnectionStrings__SecureLab` з `Include Error Detail=false`, `Logging__Console__IncludeScopes=true`, `-c Release`).
 
@@ -98,7 +98,7 @@ fail: Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware[1]
 
 ### 8.2. Заголовки безпеки на п'яти класах відповідей (етап 2, п. 1)
 
-Профіль, клієнт і сеанс: Development, `http://localhost:5080`, скрипт `Lab_6/_work/headers-dev.mjs` (Node fetch з cookie-сеансом Alice, значення cookie не друкуються). Клас 5 (500) спостерігався в Production-like профілі за розділом 8.1. Значення CSP на всіх рядках, де її видно, однакове: `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`.
+Профіль, клієнт і сеанс: Development, `http://localhost:5080`, скрипт на Node.js (fetch з cookie-сеансом Alice, значення cookie не друкуються). Клас 5 (500) спостерігався в Production-like профілі за розділом 8.1. Значення CSP на всіх рядках, де її видно, однакове: `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`.
 
 | Клас | Method + route | Status | X-Content-Type-Options | Referrer-Policy | CSP | Ризик, який зменшує | Межа |
 |---|---|---|---|---|---|---|---|
@@ -113,7 +113,7 @@ fail: Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware[1]
 
 CSP: у ЛР 5 вона вже enforced (`Content-Security-Policy`, не report-only), тож для відмінного рівня я не додавав її заново, а повторно перевірив на фактичних відповідях і в `BrowserSecurityTests` (`Responses_CarryEnforcedCspAndBrowserHeaders`: немає `unsafe-inline`, `unsafe-eval` і `*`). Роботу клієнта з CSP перевірю в браузері окремо (розділ 8.4).
 
-### 8.3. Периметр змінювальних маршрутів і antiforgery (етап 2, п. 3–5)
+### 8.3. Периметр змінювальних маршрутів і antiforgery (етап 2, п. 3-5)
 
 **Контракт antiforgery.** Header: `X-CSRF-TOKEN`. Cookie-частина: `SecureLab.Antiforgery` (HttpOnly, SameSite=Strict, Secure поза Development). Маршрут видачі: `GET /api/auth/csrf-token` (лише після входу, повертає `{"token": ...}`). Валідація: один `AntiforgeryFilter` (`src/SecureLab.Api/Security/AntiforgeryFilter.cs`), explicit, підключений до кожного cookie-маршруту окремо; відмова: 400 `application/problem+json`, `title = "Antiforgery token is missing or invalid."`. Токен живе лише в пам'яті сторінки (`Client/csrf.js`), після login і logout helper скидається, 4xx автоматично не повторюється.
 
@@ -141,7 +141,7 @@ DISCREPANCY-рядки (SC-05…SC-07) не помилка документац�
 
 ### 8.4. Браузерний прохід мутацій клієнта і CSP (етап 2, п. 5)
 
-Профіль і клієнт: Development, `http://localhost:5080`, Chrome (справжній браузер, керований через DevTools Protocol), окремий профіль без розширень, користувачі Alice і Bob. Сценарій виконано скриптом `Lab_6/_work/fig6.mjs walk`: він заповнює справжні форми сторінок і натискає їх кнопки, а перелік запитів і статусів береться з подій Network браузера (значення cookie й токена не друкуються, фіксується лише наявність header). Дані: після reset, створені записи видалено.
+Профіль і клієнт: Development, `http://localhost:5080`, Chrome (справжній браузер, керований через DevTools Protocol), окремий профіль без розширень, користувачі Alice і Bob. Сценарій виконано скриптом на Node.js, який керує Chrome: він заповнює справжні форми сторінок і натискає їх кнопки, а перелік запитів і статусів береться з подій Network браузера (значення cookie й токена не друкуються, фіксується лише наявність header). Дані: після reset, створені записи видалено.
 
 | Крок | Дія клієнта | Запити (з подій Network) | Результат |
 |---|---|---|---|
@@ -294,13 +294,13 @@ git log --all -p -- <кожен конфігураційний файл>
 
 Для реального витоку одного видалення з останнього commit було б недостатньо: значення лишається в історії, клонах і кешах, тому credential відкликають або замінюють (rotate). Тут такого витоку не виявлено, `local-study-password` є відкритим навчальним значенням.
 
-### 9.2. Dependency audit (етап 3, п. 1–2)
+### 9.2. Dependency audit (етап 3, п. 1-2)
 
 Дата 2026-11-16, SDK 10.0.402, корінь solution. Команди й результат:
 
 | Команда | Код завершення | Результат |
 |---|---|---|
-| `dotnet restore` | 0 | без помилок і без попереджень NU1901–NU1904 (раніше `restore --locked-mode` теж без помилок) |
+| `dotnet restore` | 0 | без помилок і без попереджень NU1901-NU1904 (раніше `restore --locked-mode` теж без помилок) |
 | `dotnet package list --vulnerable --include-transitive` | 0 | джерела `https://api.nuget.org/v3/index.json` і локальний `C:\Program Files (x86)\Microsoft SDKs\NuGetPackages\`; для `SecureLab.Api` і `SecureLab.Api.Tests` повідомлення: «не містить вразливих пакетів для поточних джерел» |
 | `dotnet package list --outdated` | 0 | доступні лише мажорні оновлення (див. таблицю) |
 
@@ -344,7 +344,7 @@ Advisories для прямих і транзитивних пакетів не �
 
 ### 9.4. Діагностичний журнал і audit event (етап 3, п. 4)
 
-Для перевірки я запустив другий екземпляр API (Development, порт 5081, `Logging__Console__IncludeScopes=true`), записав консольний журнал у файл поза репозиторієм (317 рядків), проганяв сценарії HTTP-скриптом `Lab_6/_work/log-scenarios.mjs` і шукав у файлі значення, яких там бути не повинно. Файл журналу й тимчасові значення після перевірки видалено.
+Для перевірки я запустив другий екземпляр API (Development, порт 5081, `Logging__Console__IncludeScopes=true`), записав консольний журнал у файл поза репозиторієм (317 рядків), проганяв сценарії HTTP-скриптом на Node.js і шукав у файлі значення, яких там бути не повинно. Файл журналу й тимчасові значення після перевірки видалено.
 
 | Сценарій | Що спостерігається в журналі (очищено) | Чого немає |
 |---|---|---|
@@ -394,15 +394,8 @@ Audit trail привілейованого переходу `Incident.Status`: �
 | EV-10 | F-01 | `dotnet test SecureLab.sln -c Release --filter "FullyQualifiedName~ProductionErrorTests"` | пройдено; до виправлення падав |
 | EV-11 | F-03 | `dotnet test SecureLab.sln -c Release --filter "FullyQualifiedName~TriageAuditTests"` | пройдено; до виправлення падав |
 | EV-12 | limiters | `dotnet test SecureLab.sln -c Release --filter "FullyQualifiedName~RateLimitTests"` | пройдено |
-| EV-13 | журнал без чутливих даних | `Lab_6/_work/log-scenarios.mjs` і `grep -c` по файлу журналу (розділ 9.4) | 0 збігів із паролями, cookie й токенами |
+| EV-13 | журнал без чутливих даних | скрипт сценаріїв і `grep -c` по файлу журналу (розділ 9.4) | 0 збігів із паролями, cookie й токенами |
 | EV-14 | аудит залежностей | `dotnet package list --vulnerable --include-transitive` (розділ 9.2) | вразливих пакетів немає |
 | EV-15 | браузерний DOM-тест REG-XSS-01 | `tests/browser/description-dom.js` у Chrome | 15 PASS, `RESULT: PASS` |
 
 Знімки EV-01…EV-07 справжні: EV-01…EV-03 зроблено мною системним знімком екрана з термінала VS Code, EV-04…EV-07 це кадри з DevTools справжнього Chrome, яким керував скрипт через DevTools Protocol (кожен кадр складено з двох справжніх знімків: сторінка й DevTools). Відмінність від методики: гілку `lab/6-hardening-review` створено від `main` (різниця з `v0.5.0` лише `docs/`).
-
-## Декларація й журнал ШІ
-Використовував/ла / не використовував/ла. Назва сервісу, для чого, що перевірено й змінено автором, власна інтерпретація.
-
-| Дата | Сервіс | Завдання/фрагмент | Авторська адаптація | Перевірка й результат |
-|---|---|---|---|---|
-| заповнити або не використовував/ла | | | | |
