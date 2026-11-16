@@ -9,9 +9,9 @@ public sealed class SessionsFixture : IDisposable
     public SessionsFixture()
     {
         Factory = new SecureLabApiFactory();
-        alice = new(() => Factory.LoginAsync("alice", StudyPassword));
-        bob = new(() => Factory.LoginAsync("bob", StudyPassword));
-        morgan = new(() => Factory.LoginAsync("morgan", StudyPassword));
+        alice = new(() => Factory.LoginAsync("alice", StudyPassword).WithAntiforgeryTokenAsync());
+        bob = new(() => Factory.LoginAsync("bob", StudyPassword).WithAntiforgeryTokenAsync());
+        morgan = new(() => Factory.LoginAsync("morgan", StudyPassword).WithAntiforgeryTokenAsync());
     }
 
     public SecureLabApiFactory Factory { get; }

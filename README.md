@@ -136,3 +136,43 @@ docs/                    карта архітектури, варіант, ма
 
 Перед commit перегляньте `git status`, `git diff --staged` і переконайтеся, що
 до Git не потрапили `.env`, cookies, tokens, реальні passwords, dumps або logs.
+
+
+## 8. ЛР 6: перевірка безпеки
+
+Звіт і докази: `docs/security-review.md`, `docs/threat-model.md`, `docs/findings/`,
+`docs/evidence/lab06/`.
+
+Повний набір тестів (потрібна змінна `SeedUsers__Password` у цьому терміналі,
+API зупинено, дані після `--reset-database`):
+
+```bash
+dotnet test SecureLab.sln -c Release
+```
+
+Antiforgery для cookie-маршрутів, що змінюють стан (`POST /api/incidents`,
+`PUT` і `DELETE /api/incidents/{id}`, `POST /api/incidents/{id}/triage`,
+`POST /api/auth/logout`): після входу `GET /api/auth/csrf-token` повертає
+`{"token": ...}`, а змінювальний запит має передати його в header
+`X-CSRF-TOKEN` разом із cookie `SecureLab.Antiforgery`. Без валідної пари
+відповідь 400 Problem Details і ресурс не змінюється. Клієнтський helper:
+`src/SecureLab.Api/Client/csrf.js`.
+
+Ліміти запитів задаються конфігурацією: `LoginRateLimit:PermitLimit` і
+`LoginRateLimit:WindowSeconds` (за замовчуванням 20 на 60 с за IP),
+`SearchRateLimit:PermitLimit` і `SearchRateLimit:WindowSeconds` (60 на 60 с на
+користувача).
+
+Production-like запуск (без launch profile, лише локально, значення навчальні):
+
+```powershell
+$db = "Host=127.0.0.1;Port=54329;Database=securelab;Username=securelab"
+$db = "$db;Password=local-study-password;Include Error Detail=false"
+$env:ASPNETCORE_ENVIRONMENT = "Production"
+$env:ASPNETCORE_URLS = "http://localhost:5080"
+$env:ConnectionStrings__SecureLab = $db
+$env:Logging__Console__IncludeScopes = "true"
+dotnet run --project src/SecureLab.Api --no-launch-profile -c Release
+```
+
+Після запуску приберіть ці змінні (`Remove-Item Env:ASPNETCORE_ENVIRONMENT` тощо).

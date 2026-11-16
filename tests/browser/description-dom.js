@@ -15,7 +15,7 @@ await (async () => {
     return response.status === 200 ? response.json() : null;
   };
   const createIncident = async (title, description) => {
-    const response = await fetch("/api/incidents", {
+    const response = await window.SecureLabCsrf.mutate("/api/incidents", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title, description, severity: "Low", occurredAtUtc: new Date().toISOString() })

@@ -5,6 +5,7 @@ using SecureLab.Api.Application.Incidents;
 using SecureLab.Api.Data;
 using SecureLab.Api.Presentation.Endpoints;
 using Microsoft.AspNetCore.Authorization;
+using SecureLab.Api.Security;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
@@ -25,6 +26,7 @@ builder.Services.AddScoped<AuthorizationAudit>();
 builder.Services.AddSingleton<IAuthorizationHandler, IncidentAccessHandler>();
 
 builder.AddLab03Identity();
+builder.AddCsrfProtection();
 
 if (builder.Environment.IsDevelopment())
 {
@@ -50,9 +52,6 @@ if (resetRequested)
     return;
 }
 
-app.UseExceptionHandler();
-app.UseStatusCodePages();
-
 const string contentSecurityPolicy =
     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
     + "connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; "
@@ -61,19 +60,27 @@ const string cspHeaderName = "Content-Security-Policy";
 
 app.Use(async (context, next) =>
 {
-    context.Response.Headers.XContentTypeOptions = "nosniff";
-    context.Response.Headers.Append("Referrer-Policy", "no-referrer");
-
     var isDevelopmentApiReference =
         app.Environment.IsDevelopment()
         && context.Request.Path.StartsWithSegments("/scalar");
-    if (!isDevelopmentApiReference)
+
+    context.Response.OnStarting(() =>
     {
-        context.Response.Headers[cspHeaderName] = contentSecurityPolicy;
-    }
+        context.Response.Headers.XContentTypeOptions = "nosniff";
+        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+        if (!isDevelopmentApiReference)
+        {
+            context.Response.Headers[cspHeaderName] = contentSecurityPolicy;
+        }
+
+        return Task.CompletedTask;
+    });
 
     await next(context);
 });
+
+app.UseExceptionHandler();
+app.UseStatusCodePages();
 
 if (app.Environment.IsDevelopment())
 {
@@ -107,6 +114,7 @@ app.MapGet("/health", async (SecureLabDbContext dbContext, CancellationToken can
 app.MapIncidentEndpoints();
 app.MapIncidentCommentEndpoints();
 app.MapLab03Identity();
+app.MapCsrfEndpoints();
 app.MapLab02Endpoints();
 app.MapFallbackToFile("index.html");
 

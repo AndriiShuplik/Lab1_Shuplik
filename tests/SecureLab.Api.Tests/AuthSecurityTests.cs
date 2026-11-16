@@ -122,6 +122,7 @@ public sealed class AuthSecurityTests(SecureLabApiFactory factory) : IClassFixtu
     public async Task A04_CreateWithoutOwner_UsesPrincipal()
     {
         using var client = await factory.LoginAsync("bob", StudyPassword);
+        await client.UseAntiforgeryTokenAsync();
         using var response = await client.PostAsJsonAsync("/api/incidents", IncidentBody(UniqueTitle("owner-implicit")));
         var created = await response.Content.ReadFromJsonAsync<JsonElement>();
         var id = created.GetProperty("id").GetGuid();
@@ -141,6 +142,7 @@ public sealed class AuthSecurityTests(SecureLabApiFactory factory) : IClassFixtu
     public async Task A05_ForgedOwnerInBody_IsIgnored()
     {
         using var client = await factory.LoginAsync("bob", StudyPassword);
+        await client.UseAntiforgeryTokenAsync();
         using var response = await client.PostAsJsonAsync(
             "/api/incidents", IncidentBody(UniqueTitle("owner-forged"), DbSeeder.AliceId));
         var created = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -162,6 +164,7 @@ public sealed class AuthSecurityTests(SecureLabApiFactory factory) : IClassFixtu
     public async Task A06_Logout_EndsSession()
     {
         using var client = await factory.LoginAsync("alice", StudyPassword);
+        await client.UseAntiforgeryTokenAsync();
         using var before = await client.GetAsync("/api/auth/session-check");
         using var logout = await client.PostAsync("/api/auth/logout", null);
         using var after = await client.GetAsync("/api/auth/session-check");

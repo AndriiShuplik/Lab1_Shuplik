@@ -109,6 +109,7 @@ document.querySelector("#login").addEventListener("submit", async event => {
   });
   result.textContent = `Login: ${response.status}`;
   if (response.status === 204) {
+    window.SecureLabCsrf.reset();
     await loadProfile();
   }
 });
@@ -119,11 +120,12 @@ document.querySelector("#me").addEventListener("click", async () => {
 });
 
 document.querySelector("#logout").addEventListener("click", async () => {
-  const response = await apiFetch("/api/auth/logout", { method: "POST" });
+  const response = await window.SecureLabCsrf.mutate("/api/auth/logout", { method: "POST" });
   if (response.status !== 204) {
     result.textContent = `Logout: ${response.status}`;
     return;
   }
+  window.SecureLabCsrf.reset();
   clearProfile();
   incidentForm.reset();
   const status = await loadProfile();
@@ -139,7 +141,7 @@ incidentForm.addEventListener("submit", async event => {
     severity: data.get("severity"),
     occurredAtUtc: new Date(data.get("occurredAt")).toISOString()
   });
-  const response = await apiFetch("/api/incidents", {
+  const response = await window.SecureLabCsrf.mutate("/api/incidents", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body
