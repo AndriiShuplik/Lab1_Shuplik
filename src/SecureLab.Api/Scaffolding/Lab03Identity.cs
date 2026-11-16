@@ -4,6 +4,7 @@ using System.Net.Mail;
 using Microsoft.AspNetCore.Identity;
 using SecureLab.Api.Data;
 using SecureLab.Api.Data.Entities;
+using SecureLab.Api.Security;
 using System.Security.Claims;
 
 namespace SecureLab.Api.Scaffolding;
@@ -130,7 +131,7 @@ public static class Lab03Identity
         {
             await signIn.SignOutAsync();
             return Results.NoContent();
-        });
+        }).RequireAuthorization().AddEndpointFilter<AntiforgeryFilter>();
 
         app.MapGet("/api/me", async (HttpContext context, UserManager<ApplicationUser> users) =>
         {

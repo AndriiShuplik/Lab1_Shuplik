@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SecureLab.Api.Data;
 using SecureLab.Api.Data.Entities;
 using SecureLab.Api.Application.Incidents;
+using SecureLab.Api.Security;
 
 namespace SecureLab.Api.Scaffolding;
 
@@ -134,7 +135,7 @@ public static class Lab02Endpoints
                 incident.OccurredAtUtc,
                 incident.CreatedAtUtc);
             return Results.Created($"/api/incidents/{incident.Id}", response);
-        }).RequireAuthorization();
+        }).RequireAuthorization().AddEndpointFilter<AntiforgeryFilter>();
     }
 
     private static string EscapeLike(string value) =>

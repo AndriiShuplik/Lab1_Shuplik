@@ -5,6 +5,7 @@ using SecureLab.Api.Application.Incidents;
 using SecureLab.Api.Data;
 using SecureLab.Api.Data.Entities;
 using SecureLab.Api.Presentation.Contracts;
+using SecureLab.Api.Security;
 
 namespace SecureLab.Api.Presentation.Endpoints;
 
@@ -38,21 +39,24 @@ public static class IncidentEndpoints
             .Produces<IncidentUpdatedResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status403Forbidden)
-            .ProducesProblem(StatusCodes.Status404NotFound);
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .AddEndpointFilter<AntiforgeryFilter>();
 
         group.MapDelete("/{id:guid}", DeleteAsync)
             .WithName("DeleteIncident")
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status409Conflict);
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .AddEndpointFilter<AntiforgeryFilter>();
 
         group.MapPost("/{id:guid}/triage", TriageAsync)
             .WithName("TriageIncident")
             .Produces<IncidentStatusResponse>()
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status409Conflict);
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .AddEndpointFilter<AntiforgeryFilter>();
 
         return endpoints;
     }

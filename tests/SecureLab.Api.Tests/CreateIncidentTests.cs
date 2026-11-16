@@ -13,7 +13,7 @@ public sealed class CreateIncidentTests(SecureLabApiFactory factory) : IClassFix
         ?? throw new InvalidOperationException("Set local SeedUsers__Password outside Git.");
 
     private async Task<HttpClient> ClientAsync() =>
-        _client ??= await factory.LoginAsync("alice", StudyPassword);
+        _client ??= await factory.LoginAsync("alice", StudyPassword).WithAntiforgeryTokenAsync();
 
         private async Task<HttpResponseMessage> PostAsync(
         string title, string description, string severity, DateTimeOffset occurredAtUtc)

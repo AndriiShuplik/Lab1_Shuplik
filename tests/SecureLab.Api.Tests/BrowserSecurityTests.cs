@@ -102,6 +102,7 @@ public sealed class BrowserSecurityTests(SecureLabApiFactory factory) : IClassFi
     [InlineData("/browser-lab.js")]
     [InlineData("/auth-lab.js")]
     [InlineData("/app.js")]
+    [InlineData("/csrf.js")]
     public async Task ClientScripts_DoNotUseDangerousHtmlSinks(string path)
     {
         using var client = factory.CreateClient();
